@@ -18,11 +18,11 @@ env/
 poetry.lock
 
 # Jupyter
-.ipynb_checkpoints/
-*.ipynb_checkpoints
+#.ipynb_checkpoints/
+#*.ipynb_checkpoints
 
 # Data files (large binary)
-#data/*.parquet
+data/*.parquet
 
 # IDE
 .vscode/
