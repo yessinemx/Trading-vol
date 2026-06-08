@@ -1,25 +1,25 @@
-[project]
+[tool.poetry]
 name = "fx-backtester"
 version = "0.1.0"
 description = "FX Option Backtesting Engine"
-authors = [
-    {name = "Yassine Mannai",email = "menai.yessine@gmail.com"}
-]
+authors = ["Yassine Mannai <yassine.mannai@dauphine.eu>"]
 readme = "README.md"
-requires-python = ">=3.11"
-dependencies = [
-    "pandas (>=3.0.2,<4.0.0)",
-    "numpy (>=2.4.4,<3.0.0)",
-    "scipy (>=1.17.1,<2.0.0)",
-    "matplotlib (>=3.10.8,<4.0.0)",
-    "seaborn (>=0.13.2,<0.14.0)",
-    "plotly (>=6.7.0,<7.0.0)",
-    "pyarrow (>=23.0.1,<24.0.0)",
-    "jupyter (>=1.1.1,<2.0.0)",
-    "ipykernel (>=7.2.0,<8.0.0)",
-    "streamlit (>=1.56.0,<2.0.0)"
-]
+packages = [{include = "src"}]
 
+[tool.poetry.dependencies]
+python = ">=3.11,<4.0"
+pandas = ">=3.0.2,<4.0.0"
+numpy = ">=2.4.4,<3.0.0"
+scipy = ">=1.17.1,<2.0.0"
+matplotlib = ">=3.10.8,<4.0.0"
+seaborn = ">=0.13.2,<0.14.0"
+plotly = ">=6.7.0,<7.0.0"
+pyarrow = ">=23.0.1,<24.0.0"
+jupyter = ">=1.1.1,<2.0.0"
+ipykernel = ">=7.2.0,<8.0.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = ">=8.0.0,<9.0.0"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]

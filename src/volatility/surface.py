@@ -1,0 +1,100 @@
+"""Volatility surface interpolation.
+
+Spec:
+    - Strike / vol space: cubic-spline interpolation, *linear* extrapolation.
+    - Time dimension: linear interpolation between adjacent maturities,
+      linear extrapolation beyond the quoted tenors.
+"""
+
+import numpy as np
+import pandas as pd
+from scipy.interpolate import CubicSpline
+from scipy.interpolate import interp1d
+
+
+class _StrikeSmile:
+    """Single-maturity smile: cubic spline inside, linear outside."""
+
+    def __init__(self, strikes: np.ndarray, vols: np.ndarray):
+        self._k_min = float(strikes[0])
+        self._k_max = float(strikes[-1])
+        self._v_min = float(vols[0])
+        self._v_max = float(vols[-1])
+        # Natural cubic spline for interpolation (no extrapolation here).
+        self._spline = CubicSpline(strikes, vols, extrapolate=False)
+        # Boundary slopes for *linear* extrapolation.
+        self._slope_low = float(self._spline(self._k_min, 1))
+        self._slope_high = float(self._spline(self._k_max, 1))
+
+    def __call__(self, strike: float) -> float:
+        if strike < self._k_min:
+            v = self._v_min + self._slope_low * (strike - self._k_min)
+        elif strike > self._k_max:
+            v = self._v_max + self._slope_high * (strike - self._k_max)
+        else:
+            v = float(self._spline(strike))
+        # Implied vol must stay strictly positive after linear extrapolation.
+        return max(v, 1e-4)
+
+
+class VolSurface:
+    """
+    Builds a vol surface for a single date.
+
+    Strike interpolation: cubic spline.
+    Strike extrapolation: linear (boundary-slope extension).
+    Time interpolation/extrapolation: linear.
+    """
+
+    def __init__(self, df_date: pd.DataFrame):
+        """
+        df_date: subset of vol surface DataFrame for one DATE,
+                 with columns [DATE, MATURITY, MID_STRIKE, MID_PRICE].
+        """
+        self._smiles: dict[float, _StrikeSmile] = {}
+        self._tenors: list[float] = []
+
+        ref_date = df_date["DATE"].iloc[0]
+        for maturity, grp in df_date.groupby("MATURITY"):
+            t = (maturity - ref_date).days / 365.25
+            if t <= 0:
+                continue
+            grp = grp.sort_values("MID_STRIKE").dropna(subset=["MID_STRIKE", "MID_PRICE"])
+            grp = grp.drop_duplicates(subset="MID_STRIKE")
+            if len(grp) < 3:
+                continue
+            strikes = grp["MID_STRIKE"].values.astype(float)
+            vols = grp["MID_PRICE"].values.astype(float)
+            # Collapse maturities that round to the same year-fraction.
+            if t in self._smiles:
+                continue
+            self._smiles[t] = _StrikeSmile(strikes, vols)
+            self._tenors.append(t)
+
+        self._tenors = sorted(self._tenors)
+
+    @property
+    def is_empty(self) -> bool:
+        return len(self._tenors) == 0
+
+    def get_vol(self, strike: float, t: float) -> float:
+        """Return implied vol for a given strike and time-to-maturity (years)."""
+        if not self._tenors:
+            raise ValueError("Empty vol surface.")
+
+        tenors = np.array(self._tenors)
+        vols_at_strike = np.array([self._smiles[t_](strike) for t_ in tenors])
+
+        if tenors.size == 1:
+            return float(vols_at_strike[0])
+
+        # Linear interpolation + linear extrapolation in the time dimension.
+        time_interp = interp1d(
+            tenors,
+            vols_at_strike,
+            kind="linear",
+            bounds_error=False,
+            fill_value="extrapolate",
+        )
+        return float(time_interp(t))
+

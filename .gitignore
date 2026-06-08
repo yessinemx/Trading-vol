@@ -21,8 +21,22 @@ poetry.lock
 .ipynb_checkpoints/
 *.ipynb_checkpoints
 
-# Data files (large binary)
-data/*.parquet
+# Data files 
+data/
+
+# Generated outputs
+outputs/*.csv
+outputs/*.png
+outputs/*.html
+
+# pytest / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# OS
+.DS_Store
+Thumbs.db
 
 # IDE
 .vscode/
