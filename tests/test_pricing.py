@@ -1,4 +1,4 @@
-﻿"""Unit tests for the Garman-Kohlhagen pricer."""
+﻿"""Tests: Garman-Kohlhagen scalar pricer."""
 
 import numpy as np
 
@@ -6,7 +6,7 @@ from src.pricing.garman_kohlhagen import garman_kohlhagen
 
 
 def test_put_call_parity():
-    """C - P = S e^{-rf T} - K e^{-rd T}."""
+    # C - P = S e^{-rf T} - K e^{-rd T}
     S, K, T, rd, rf, sigma = 1.10, 1.12, 0.5, 0.03, 0.01, 0.10
     call = garman_kohlhagen(S, K, T, rd, rf, sigma, "call").price
     put = garman_kohlhagen(S, K, T, rd, rf, sigma, "put").price
@@ -39,6 +39,7 @@ def test_expiry_intrinsic():
 
 
 def test_degenerate_inputs_are_finite():
+    # zero vol shouldn't blow up
     res = garman_kohlhagen(1.10, 1.10, 0.25, 0.02, 0.01, 0.0, "call")
     assert np.isfinite(res.price)
 

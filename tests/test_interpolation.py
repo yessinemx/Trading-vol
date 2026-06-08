@@ -1,4 +1,4 @@
-﻿"""Unit tests for curve and vol-surface interpolation."""
+﻿"""Tests: curve + vol surface interpolation."""
 
 import numpy as np
 import pandas as pd
@@ -9,13 +9,13 @@ from src.volatility.surface import VolSurface
 
 def test_curve_linear_interpolation():
     curve = CurveInterpolator(np.array([0.25, 1.0]), np.array([0.02, 0.04]))
-    # Midpoint in time → midpoint in rate.
+    # midpoint in time -> midpoint in rate
     assert abs(curve(0.625) - 0.03) < 1e-12
 
 
 def test_curve_linear_extrapolation():
     curve = CurveInterpolator(np.array([1.0, 2.0]), np.array([0.02, 0.03]))
-    # Slope is 0.01/yr → extrapolate to t=3 gives 0.04.
+    # slope 0.01/yr, extrapolate to t=3 -> 0.04
     assert abs(curve(3.0) - 0.04) < 1e-12
 
 
@@ -27,7 +27,7 @@ def test_curve_handles_duplicate_tenors():
     assert np.isfinite(val)
 
 
-def _toy_surface() -> pd.DataFrame:
+def _toy_surface():
     date = pd.Timestamp("2024-01-02")
     rows = []
     for mat_days, base in [(30, 0.10), (90, 0.12)]:
@@ -41,13 +41,12 @@ def _toy_surface() -> pd.DataFrame:
 
 def test_vol_surface_atm_interpolation():
     vs = VolSurface(_toy_surface())
-    # ATM (k=1.0) at the 30d tenor (~0.082y) should be the quoted 0.10.
     v = vs.get_vol(1.0, 30 / 365.25)
     assert abs(v - 0.10) < 5e-3
 
 
 def test_vol_surface_positive_extrapolation():
     vs = VolSurface(_toy_surface())
-    # Far OTM strike → linear extrapolation must stay positive.
+    # far OTM -> linear extrap must stay > 0
     v = vs.get_vol(2.0, 30 / 365.25)
     assert v > 0

@@ -13,10 +13,8 @@ delta hedging, Greeks P&L attribution and a signal/sizing framework.
 
 ---
 
-## Table of contents
 
 - [FX Option Backtesting Engine](#fx-option-backtesting-engine)
-  - [Table of contents](#table-of-contents)
   - [Highlights](#highlights)
   - [Architecture](#architecture)
   - [Project layout](#project-layout)

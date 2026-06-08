@@ -1,4 +1,4 @@
-"""Unit tests for performance and risk metrics and Greeks attribution"""
+"""Tests: performance/risk metrics + greek attribution."""
 
 import numpy as np
 import pandas as pd
@@ -13,7 +13,8 @@ from src.analytics.greeks_pnl import attribute_pnl
 
 def test_sharpe_zero_for_constant():
     r = pd.Series([5.0] * 100)
-    assert np.isnan(PerformanceMetrics(r).sharpe())  # zero variance, undefined
+    # zero variance -> sharpe is undefined
+    assert np.isnan(PerformanceMetrics(r).sharpe())
 
 
 def test_sortino_only_penalises_downside():
@@ -32,7 +33,7 @@ def test_var_cvar_ordering():
     rm = RiskMetrics(r, confidence=0.95)
     v = rm.var()
     c = rm.cvar()
-    assert c <= v  # expected shortfall is at least as extreme as VaR
+    assert c <= v  # ES at least as extreme as VaR
 
 
 def test_performance_summary_keys():
@@ -62,3 +63,4 @@ def test_attribution_sums_to_actual():
         dS=0.01, dSigma=0.005, dt=1 / 252, actual_pnl=12.34,
     )
     assert abs(g.total() - 12.34) < 1e-9
+

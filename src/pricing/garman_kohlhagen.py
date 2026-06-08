@@ -1,7 +1,8 @@
-"""Garman-Kohlhagen closed-form pricing model for FX options"""
+"""Garman-Kohlhagen FX option pricer (scalar + vectorised)"""
 
 import numpy as np
 from scipy.stats import norm
+    from scipy.special import ndtr
 from dataclasses import dataclass
 
 
@@ -16,37 +17,11 @@ class GKResult:
     rho_f: float
 
 
-def garman_kohlhagen(
-    S: float,
-    K: float,
-    T: float,
-    r_d: float,
-    r_f: float,
-    sigma: float,
-    option_type: str = "call",
-) -> GKResult:
-    """
-    Price an FX option using the Garman-Kohlhagen model
-
-    Parameters
-    ----------
-    S: spot rate (domestic per foreign unit)
-    K: strike rate
-    T: time to maturity in years
-    r_d: domestic continuously-compounded risk-free rate (decimal)
-    r_f: foreign continuously-compounded risk-free rate (decimal)
-    sigma: implied volatility (decimal)
-    option_type: 'call' or 'put'
-
-    Returns
-    -------
-    GKResult containing price and all first-order Greeks
-    """
+def garman_kohlhagen(S, K, T, r_d, r_f, sigma, option_type="call"):
     if T <= 0:
         intrinsic = max(S - K, 0) if option_type == "call" else max(K - S, 0)
         return GKResult(intrinsic, float(S > K) if option_type == "call" else float(S < K), 0, 0, 0, 0, 0)
 
-    # guard degenerate inputs that may arise from extrapolated market data
     sigma = max(float(sigma), 1e-6)
     if not (np.isfinite(S) and np.isfinite(K) and np.isfinite(sigma) and S > 0 and K > 0):
         return GKResult(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
@@ -86,34 +61,14 @@ def garman_kohlhagen(
         price=price,
         delta=delta,
         gamma=gamma,
-        vega=vega / 100,  # per 1% vol move
+        vega=vega / 100,    # per 1% vol move
         theta=theta / 365,  # per calendar day
         rho_d=rho_d / 100,
         rho_f=rho_f / 100,
     )
 
 
-def garman_kohlhagen_vec(
-    S: np.ndarray,
-    K: np.ndarray,
-    T: np.ndarray,
-    r_d: np.ndarray,
-    r_f: np.ndarray,
-    sigma: np.ndarray,
-    is_call: np.ndarray,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """
-    Vectorized Garman-Kohlhagen pricer over a portfolio of positions
-
-    All inputs are 1-D numpy arrays of equal length.
-    is_call: boolean array (True = call, False = put)
-
-    Returns
-    -------
-    Tuple (price, delta, gamma, vega, theta) as float64 arrays
-    Vega is scaled per 1% vol move; theta is scaled per calendar day
-    """
-    from scipy.special import ndtr  # ndtr is faster than norm.cdf for array inputs
+def garman_kohlhagen_vec(S, K, T, r_d, r_f, sigma, is_call):
 
     S = np.asarray(S, dtype=float)
     K = np.asarray(K, dtype=float)
@@ -130,7 +85,7 @@ def garman_kohlhagen_vec(
     vega = np.zeros(n, dtype=float)
     theta = np.zeros(n, dtype=float)
 
-    # expired positions: settle at intrinsic value
+    # expired legs -> settle at intrinsic
     expired = T <= 0
     if expired.any():
         dS = S[expired] - K[expired]
@@ -139,7 +94,7 @@ def garman_kohlhagen_vec(
                                   (dS > 0).astype(float),
                                   -(dS < 0).astype(float))
 
-    # live positions: filter degenerate inputs before pricing
+    # live legs only
     valid = ~expired & np.isfinite(S) & np.isfinite(K) & np.isfinite(sigma) & (S > 0) & (K > 0)
     if valid.any():
         Sv, Kv, Tv = S[valid], K[valid], T[valid]
@@ -152,7 +107,7 @@ def garman_kohlhagen_vec(
 
         nd1 = ndtr(d1);   nd2 = ndtr(d2)
         nd1n = ndtr(-d1); nd2n = ndtr(-d2)
-        npd1 = np.exp(-0.5 * d1 ** 2) * (1.0 / np.sqrt(2 * np.pi)) 
+        npd1 = np.exp(-0.5 * d1 ** 2) * (1.0 / np.sqrt(2 * np.pi))
 
         disc_d = np.exp(-rdv * Tv)
         disc_f = np.exp(-rfv * Tv)
@@ -169,6 +124,7 @@ def garman_kohlhagen_vec(
         theta_put  = (-Sv * disc_f * npd1 * sv / (2 * sqrtT)
                       + rdv * Kv * disc_d * nd2n
                       - rfv * Sv * disc_f * nd1n)
-        theta[valid] = np.where(cv, theta_call, theta_put) / 365.0  
+        theta[valid] = np.where(cv, theta_call, theta_put) / 365.0
 
     return price, delta, gamma, vega, theta
+
