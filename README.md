@@ -7,7 +7,7 @@ delta hedging, Greeks P&L attribution and a signal/sizing framework.
 <p align="left">
   <img alt="Python"  src="https://img.shields.io/badge/python-3.11%2B-blue">
   <img alt="Poetry"  src="https://img.shields.io/badge/build-poetry-60a5fa">
-  <img alt="Tests"   src="https://img.shields.io/badge/tests-17%20passing-brightgreen">
+  <img alt="Tests"   src="https://img.shields.io/badge/tests-19%20passing-brightgreen">
   <img alt="License" src="https://img.shields.io/badge/license-MIT-lightgrey">
 </p>
 
@@ -92,7 +92,7 @@ src/
 └── engine.py       # Backtester orchestrator (daily loop, hedge, attribution)
 notebooks/
 └── backtester.ipynb   # End-to-end walkthrough on EUR/NOK
-tests/                 # 17 unit tests: pricing parity, interpolation, analytics
+tests/                 # Unit tests: pricing parity, interpolation, analytics
 data/                  # Parquet market data (gitignored)
 outputs/               # Generated CSV / PNG artefacts
 docs/

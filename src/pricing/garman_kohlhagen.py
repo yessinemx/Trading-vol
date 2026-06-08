@@ -2,7 +2,7 @@
 
 import numpy as np
 from scipy.stats import norm
-    from scipy.special import ndtr
+from scipy.special import ndtr
 from dataclasses import dataclass
 
 
