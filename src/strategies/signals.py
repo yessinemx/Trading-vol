@@ -1,8 +1,8 @@
-"""Basic signal components to trigger strategy entries/exits.
+"""Signal functions for conditioning strategy entries on market state
 
-These are intentionally lightweight: a signal maps the spot history up to a
-given date onto a boolean (trade / don't trade). They are consumed by
-``Strategy.signal`` and can be combined with any strategy.
+Each signal function maps the spot price history up to a given date
+onto a boolean (trade / skip). Consumed by Strategy.signal and
+composable with any strategy implementation
 """
 
 from __future__ import annotations
@@ -12,8 +12,8 @@ import pandas as pd
 
 def momentum_signal(history: pd.Series, lookback: int = 20) -> bool:
     """
-    Simple trend filter: trade only when the latest spot is above its
-    rolling mean over ``lookback`` business days (positive momentum).
+    Trend filter: trade only when the latest spot exceeds its
+    rolling mean over the lookback window (positive momentum)
     """
     if len(history) < lookback:
         return True
@@ -23,9 +23,9 @@ def momentum_signal(history: pd.Series, lookback: int = 20) -> bool:
 
 def realised_vol_signal(history: pd.Series, lookback: int = 20, threshold: float = 0.0) -> bool:
     """
-    Volatility filter: trade only when annualised realised vol over the
-    lookback window exceeds ``threshold`` (decimal). Useful for long-gamma
-    strategies that need movement to pay off.
+    Volatility filter: trade only when the annualised realised volatility
+    over the lookback window exceeds the threshold (decimal)
+    Suited to long-gamma strategies that require sufficient spot movement
     """
     if len(history) < lookback + 1:
         return True

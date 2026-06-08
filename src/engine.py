@@ -1,4 +1,4 @@
-"""Main backtesting engine: wires data, pricing, strategies, and portfolio."""
+"""Main backtesting engine orchestrating data loading, pricing, strategies and portfolio management"""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ from .analytics.greeks_pnl import attribute_pnl
 
 class Backtester:
     """
-    End-to-end FX option backtesting engine with daily delta hedging.
+    End-to-end FX option backtesting engine with daily delta hedging
 
     Usage
     -----
@@ -33,11 +33,11 @@ class Backtester:
         self._fwd: pd.DataFrame | None = None
         self._rates: pd.DataFrame | None = None
         self._vol: pd.DataFrame | None = None
-        # Pivoted {date: sub-frame} views for fast day-by-day access.
+        # date-keyed sub-frame views for fast day-by-day access
         self._fwd_by_date: dict[pd.Timestamp, pd.DataFrame] = {}
         self._rates_by_date: dict[pd.Timestamp, pd.DataFrame] = {}
         self._vol_by_date: dict[pd.Timestamp, pd.DataFrame] = {}
-        # Pre-built VolSurface objects keyed by date (built once in load_data).
+        # pre-built VolSurface objects keyed by date (constructed once in load_data)
         self._vol_surfaces: dict[pd.Timestamp, VolSurface] = {}
 
     def load_data(self) -> None:
@@ -45,33 +45,35 @@ class Backtester:
         self._fwd = self.loader.load_forward_curve()
         self._rates = self.loader.load_interest_rates()
         self._vol = self.loader.load_vol_surface()
-        # Unpack stacked data once for efficiency (spec: pivot for speed).
+        # pivot stacked data once for efficient day-by-day access
         self._fwd_by_date = self.loader.pivot_by_date(self._fwd)
         self._rates_by_date = self.loader.pivot_by_date(self._rates)
         self._vol_by_date = self.loader.pivot_by_date(self._vol)
-        # Pre-build all VolSurface objects once — avoids re-fitting the
-        # CubicSpline on every simulation day (dominant cost in the hot loop).
+        # pre-build all VolSurface objects once; eliminates repeated CubicSpline
+        # fitting on every simulation day, which is the dominant computational cost
         self._vol_surfaces = {
             date: VolSurface(sub)
             for date, sub in self._vol_by_date.items()
         }
 
-    # ── Helpers ──────────────────────────────────────────────────────────────
+    # -- Helpers -------------------------------------------------------------
     @staticmethod
     def _strike_for_leg(
         leg: Leg, S: float, fwd_outright: float, rd: float, rf: float, t: float,
         vol_surface: VolSurface,
     ) -> float:
         """
-        Resolve a leg's strike from its target delta.
+        Resolve a leg's strike from its target delta
 
-        ATM (delta 0.5) → forward outright. Otherwise invert Garman-Kohlhagen
-        delta on a small strike grid around the forward to hit the target.
+        For ATM legs (delta 0.5) the strike equals the forward outright
+        For non-ATM legs, the function searches a strike grid spanning
+        +/-25% of the forward and selects the strike whose GK delta
+        best matches the target
         """
         if abs(leg.strike_delta - 0.5) < 1e-9:
             return fwd_outright
 
-        # Search strikes spanning ±25% of forward for the target |delta|.
+        # search a strike grid spanning +/-25% of the forward for the target absolute delta
         grid = np.linspace(fwd_outright * 0.75, fwd_outright * 1.25, 201)
         target = leg.strike_delta
         best_k, best_err = fwd_outright, 1e9
@@ -92,14 +94,14 @@ class Backtester:
         roll_freq: str = "W-FRI",
     ) -> dict:
         """
-        Run the backtest for the given strategy with daily delta hedging.
+        Run the backtest for the given strategy with daily delta hedging
 
-        Returns a dict with:
-          - 'metrics'    : performance summary
-          - 'daily_pnl'  : pd.Series of total daily P&L (option + hedge)
-          - 'greeks'     : pd.DataFrame of daily portfolio Greeks
+        Returns a dict with keys:
+          - 'metrics': performance summary dict
+          - 'daily_pnl': pd.Series of total daily P&L (option + hedge)
+          - 'greeks': pd.DataFrame of daily portfolio Greeks
           - 'attribution': pd.DataFrame of Greek P&L decomposition
-          - 'portfolio'  : final Portfolio object
+          - 'portfolio': final Portfolio object
         """
         assert self._spot is not None, "Call load_data() first."
 
@@ -113,10 +115,10 @@ class Backtester:
         open_positions: list[OptionPosition] = []
         records: list[dict] = []
 
-        prev_mtm = 0.0          # option-only MTM (carried for daily diff)
-        prev_S = None           # previous spot (for hedge & delta attribution)
-        prev_delta = 0.0        # previous portfolio delta (units)
-        prev_snap: dict[int, dict] = {}  # per-position snapshot for attribution
+        prev_mtm = 0.0          # option-only MTM carried forward for daily differencing
+        prev_S = None           # previous spot used for hedge rebalancing and attribution
+        prev_delta = 0.0        # previous portfolio delta in foreign-currency units
+        prev_snap: dict[int, dict] = {}  # per-position Greek snapshot for attribution
 
         for date in dates:
             if date not in self._spot.index:
@@ -134,7 +136,7 @@ class Backtester:
                 rates_date[rates_date["curve_id"] == 2], date
             )
 
-            # ── Settle expired positions at intrinsic value ──────────────────
+            # -- settle expired positions at intrinsic value -----------------
             still_open = []
             for pos in open_positions:
                 if date >= pos.expiry:
@@ -147,7 +149,7 @@ class Backtester:
                     still_open.append(pos)
             open_positions = still_open
 
-            # ── Open new legs on roll dates (gated by signal) ────────────────
+            # -- open new legs on roll dates (entry gated by signal) ---------
             if date in roll_dates:
                 history = self._spot.loc[:date, "MID_PRICE"]
                 if strategy.signal(date, S, history):
@@ -156,7 +158,7 @@ class Backtester:
                         t = leg.tenor_days / 365.25
                         rd = float(rd_interp(t))
                         rf = float(rf_interp(t))
-                        # Forward outright = spot + forward points (already in price units).
+                        # forward outright = spot + forward points (in spot price units)
                         if fwd_df is not None and not fwd_df.empty:
                             fwd_interp = CurveInterpolator.from_dataframe(fwd_df, date)
                             fwd_outright = S + float(fwd_interp(t))
@@ -186,14 +188,14 @@ class Backtester:
                         portfolio.open_position(pos)
                         open_positions.append(pos)
 
-            # ── Mark-to-market option book & aggregate Greeks ────────────────
+            # -- mark-to-market option book and aggregate Greeks -------------
             mtm = 0.0
             greeks = {"delta": 0.0, "gamma": 0.0, "vega": 0.0, "theta": 0.0}
-            # Per-position snapshot for the *next* day's attribution.
+            # per-position Greek snapshot stored for next-day attribution
             snap_today: dict[int, dict] = {}
-            # Attribution accumulators over positions alive yesterday AND today.
+            # Greek P&L accumulators over positions alive both yesterday and today
             attr_delta = attr_gamma = attr_vega = attr_theta = 0.0
-            carry_pnl = 0.0  # MTM change of continuing positions (excludes premium jumps)
+            carry_pnl = 0.0  # MTM change of continuing positions; excludes premium flows
 
             dS = (S - prev_S) if prev_S is not None else 0.0
 
@@ -217,7 +219,7 @@ class Backtester:
                 greeks["vega"]    = float((signed_ns * vegas).sum())
                 greeks["theta"]   = float((signed_ns * thetas).sum())
 
-                # Per-position snapshots + attribution (Python loop; pricing already done)
+                # per-position snapshots and attribution; pricing is already computed
                 for i, pos in enumerate(open_positions):
                     key = id(pos)
                     signed_n = signed_ns[i]
@@ -226,7 +228,7 @@ class Backtester:
                         "vega": vegas[i], "theta": thetas[i],
                         "vol": vol_arr[i], "signed_n": signed_n,
                     }
-                    # Attribute only positions that also existed yesterday.
+                    # attribute only positions that existed on the previous day
                     prev = prev_snap.get(key)
                     if prev is not None and prev_S is not None:
                         d_sigma = vol_arr[i] - prev["vol"]
@@ -245,27 +247,25 @@ class Backtester:
                         attr_theta += g.theta_pnl
                         carry_pnl  += signed_n * (prices[i] - prev["price"])
 
-            # Portfolio delta in foreign-ccy units (delta is per 1 unit notional).
+            # portfolio delta in foreign-currency units (delta per unit notional)
             port_delta_units = greeks["delta"]
 
-            # ── Daily delta hedge ────────────────────────────────────────────
+            # -- daily delta hedge -------------------------------------------
             hedge_pnl = 0.0
             if do_hedge:
-                # Hold -delta units of the foreign ccy to neutralise option delta.
+                # hold -delta units of the foreign currency to neutralise option delta
                 target_hedge = -port_delta_units
                 hedge_pnl = portfolio.rebalance_hedge(target_hedge, S)
             elif prev_S is not None:
                 hedge_pnl = portfolio.hedge_mtm(S) - portfolio.hedge_mtm(prev_S)
 
-            # ── Daily P&L: option MTM change + hedge P&L ─────────────────────
+            # -- daily P&L: option MTM change plus hedge P&L -----------------
             option_pnl = mtm - prev_mtm
             day_pnl = option_pnl + hedge_pnl
 
-            # ── Greeks P&L attribution (Delta/Gamma/Vega/Theta + residual) ──
-            # Residual is taken against the *carry* P&L of continuing positions,
-            # so premium paid/received on rolls does not pollute the decomposition.
+            # -- Greek P&L attribution (delta/gamma/vega/theta + residual) ---
             residual = carry_pnl - (attr_delta + attr_gamma + attr_vega + attr_theta)
-            # The delta leg is offset by the hedge → report the hedged delta P&L.
+            # the delta attribution is combined with hedge P&L to report the net hedged delta contribution
             hedged_delta_pnl = attr_delta + hedge_pnl
 
             records.append({

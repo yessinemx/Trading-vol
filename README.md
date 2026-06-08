@@ -94,6 +94,8 @@ and the performance & attribution analytics.
 
 ## Architecture
 
+![Architecture](docs/architecture.png)
+
 Data layer (Parquet ingest + pivot) feeds curve interpolators and the cubic-spline
 vol surface, which drive the Garman-Kohlhagen pricing engine. Per-strategy roll
 schedulers, sizing and contract specs open/close legs; a daily loop marks the book

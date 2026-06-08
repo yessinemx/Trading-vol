@@ -1,4 +1,4 @@
-"""Call ratio spread: long 1 ATM call, short 2 OTM calls."""
+"""Call ratio spread: long one ATM call, short two OTM calls"""
 
 from .base import Strategy, Leg
 

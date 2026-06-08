@@ -1,4 +1,4 @@
-"""Base class for option strategies."""
+"""Abstract base class and data structures for option strategies"""
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -15,9 +15,9 @@ class Leg:
 
 
 class Strategy(ABC):
-    """Abstract base for multi-leg FX option strategies."""
+    """Abstract base for multi-leg FX option strategies"""
 
-    #: Whether the engine should daily-delta-hedge this strategy.
+    #: whether the engine should delta-hedge this strategy daily
     delta_hedge: bool = True
 
     @property
@@ -31,27 +31,27 @@ class Strategy(ABC):
         ...
 
     def roll_dates(self, start: pd.Timestamp, end: pd.Timestamp, freq: str = "W-FRI") -> pd.DatetimeIndex:
-        """Generate rebalancing dates between start and end at the given frequency."""
+        """Generate rebalancing dates between start and end at the specified frequency"""
         return pd.date_range(start=start, end=end, freq=freq)
 
-    # ── Sizing designer ──────────────────────────────────────────────────────
+    # -- Sizing designer -----------------------------------------------------
     def size(self, leg: Leg, notional: float, spot: float) -> float:
         """
-        Convert a target notional into a per-leg traded notional.
+        Convert a target notional into a per-leg traded notional
 
-        Default sizing scales the base notional by the leg ratio. Strategies
-        can override this to implement vega-targeting, risk-parity, etc.
+        Default sizing scales the base notional by the leg ratio. Subclasses
+        can override to implement vega-targeting, risk-parity or other schemes
         """
         return notional * leg.ratio
 
-    # ── Signal hook ──────────────────────────────────────────────────────────
+    # -- Signal hook ---------------------------------------------------------
     def signal(self, date: pd.Timestamp, spot: float, history: pd.Series) -> bool:
         """
-        Entry/exit signal evaluated on each roll date.
+        Entry signal evaluated on each roll date
 
-        Returns True to allow opening the strategy on `date`, False to skip.
-        `history` is the spot series up to and including `date`.
-        Default: always trade (no signal filter).
+        Returns True to allow opening the strategy on the given date, False to skip
+        history is the spot series up to and including the current date
+        Default implementation always returns True (no filter)
         """
         return True
 

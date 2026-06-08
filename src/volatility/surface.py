@@ -1,9 +1,8 @@
-"""Volatility surface interpolation.
+"""Volatility surface construction and interpolation
 
-Spec:
-    - Strike / vol space: cubic-spline interpolation, *linear* extrapolation.
-    - Time dimension: linear interpolation between adjacent maturities,
-      linear extrapolation beyond the quoted tenors.
+Conventions:
+    - Strike dimension: cubic-spline interpolation, linear extrapolation
+    - Time dimension: linear interpolation and extrapolation across quoted tenors
 """
 
 import numpy as np
@@ -13,16 +12,16 @@ from scipy.interpolate import interp1d
 
 
 class _StrikeSmile:
-    """Single-maturity smile: cubic spline inside, linear outside."""
+    """Single-maturity smile: cubic-spline interpolation, linear extrapolation"""
 
     def __init__(self, strikes: np.ndarray, vols: np.ndarray):
         self._k_min = float(strikes[0])
         self._k_max = float(strikes[-1])
         self._v_min = float(vols[0])
         self._v_max = float(vols[-1])
-        # Natural cubic spline for interpolation (no extrapolation here).
+        # natural cubic spline for interior interpolation (no extrapolation delegated to spline)
         self._spline = CubicSpline(strikes, vols, extrapolate=False)
-        # Boundary slopes for *linear* extrapolation.
+        # boundary first-derivative slopes for linear extrapolation beyond the quoted strike range
         self._slope_low = float(self._spline(self._k_min, 1))
         self._slope_high = float(self._spline(self._k_max, 1))
 
@@ -33,23 +32,23 @@ class _StrikeSmile:
             v = self._v_max + self._slope_high * (strike - self._k_max)
         else:
             v = float(self._spline(strike))
-        # Implied vol must stay strictly positive after linear extrapolation.
+        # implied vol is floored at 1e-4 to prevent non-positive values after linear extrapolation
         return max(v, 1e-4)
 
 
 class VolSurface:
     """
-    Builds a vol surface for a single date.
+    Volatility surface for a single observation date
 
-    Strike interpolation: cubic spline.
-    Strike extrapolation: linear (boundary-slope extension).
-    Time interpolation/extrapolation: linear.
+    Strike interpolation: cubic spline
+    Strike extrapolation: linear extension via boundary derivative
+    Time interpolation and extrapolation: linear
     """
 
     def __init__(self, df_date: pd.DataFrame):
         """
-        df_date: subset of vol surface DataFrame for one DATE,
-                 with columns [DATE, MATURITY, MID_STRIKE, MID_PRICE].
+        df_date: subset of the vol surface DataFrame for a single DATE,
+                 with columns [DATE, MATURITY, MID_STRIKE, MID_PRICE]
         """
         self._smiles: dict[float, _StrikeSmile] = {}
         self._tenors: list[float] = []
@@ -65,7 +64,7 @@ class VolSurface:
                 continue
             strikes = grp["MID_STRIKE"].values.astype(float)
             vols = grp["MID_PRICE"].values.astype(float)
-            # Collapse maturities that round to the same year-fraction.
+            # skip maturities that map to the same year-fraction to avoid duplicate tenor keys
             if t in self._smiles:
                 continue
             self._smiles[t] = _StrikeSmile(strikes, vols)
@@ -78,7 +77,7 @@ class VolSurface:
         return len(self._tenors) == 0
 
     def get_vol(self, strike: float, t: float) -> float:
-        """Return implied vol for a given strike and time-to-maturity (years)."""
+        """Return implied volatility for a given strike and time to maturity in years"""
         if not self._tenors:
             raise ValueError("Empty vol surface.")
 
@@ -88,7 +87,7 @@ class VolSurface:
         if tenors.size == 1:
             return float(vols_at_strike[0])
 
-        # Linear interpolation + linear extrapolation in the time dimension.
+        # linear interpolation and extrapolation in the time dimension
         time_interp = interp1d(
             tenors,
             vols_at_strike,

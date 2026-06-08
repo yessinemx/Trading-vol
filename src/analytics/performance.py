@@ -1,4 +1,4 @@
-"""Performance metrics adapted for options strategies."""
+"""Performance metrics for options strategies"""
 
 import numpy as np
 import pandas as pd
@@ -26,12 +26,12 @@ def max_drawdown(cumulative_pnl: pd.Series) -> float:
 
 
 def var(returns: pd.Series, confidence: float = 0.95) -> float:
-    """Historical Value-at-Risk."""
+    """Historical Value-at-Risk at the given confidence level"""
     return float(np.percentile(returns, (1 - confidence) * 100))
 
 
 def cvar(returns: pd.Series, confidence: float = 0.95) -> float:
-    """Conditional VaR (Expected Shortfall)."""
+    """Conditional Value-at-Risk (Expected Shortfall)"""
     v = var(returns, confidence)
     return float(returns[returns <= v].mean())
 

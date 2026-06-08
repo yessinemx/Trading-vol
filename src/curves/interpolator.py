@@ -1,4 +1,4 @@
-"""Linear interpolation/extrapolation for forward and interest rate curves."""
+"""Linear interpolation and extrapolation for forward and interest rate term structures"""
 
 import numpy as np
 import pandas as pd
@@ -7,20 +7,20 @@ from scipy.interpolate import interp1d
 
 class CurveInterpolator:
     """
-    Linear interpolation and linear extrapolation for rate/forward curves.
+    Linear interpolation and extrapolation for rate and forward curves
 
-    Spec: forward & interest-rate curves use linear interpolation *and*
-    linear extrapolation beyond the quoted tenors.
+    Conventions: forward and interest-rate curves use linear interpolation
+    and linear extrapolation beyond the quoted tenors
 
-    Input: maturities as year fractions, rates as decimals.
+    Inputs: maturities as year fractions; rates as decimals
     """
 
     def __init__(self, tenors: np.ndarray, rates: np.ndarray):
         tenors = np.asarray(tenors, dtype=float)
         rates = np.asarray(rates, dtype=float)
 
-        # Drop non-finite points, then collapse duplicate tenors (averaging),
-        # which otherwise yield an infinite extrapolation slope.
+        # drop non-finite points and collapse duplicate tenors by averaging;
+        # duplicate tenors produce an infinite extrapolation slope in interp1d
         mask = np.isfinite(tenors) & np.isfinite(rates)
         tenors, rates = tenors[mask], rates[mask]
         if tenors.size:
@@ -41,7 +41,7 @@ class CurveInterpolator:
         if self._tenors.size == 0:
             raise ValueError("Cannot build a curve with no points.")
         if self._tenors.size == 1:
-            # Single point: flat curve (no slope available to extrapolate).
+            # single-point curve: return a flat constant (no slope to extrapolate)
             self._fn = lambda t: np.full_like(np.asarray(t, dtype=float), self._rates[0])
         else:
             self._fn = interp1d(
@@ -53,10 +53,9 @@ class CurveInterpolator:
             )
 
     def __call__(self, t: float | np.ndarray) -> float | np.ndarray:
-        # Linear extrapolation beyond the quoted tenors (per spec). Duplicate
-        # tenors are collapsed in __init__, so the slope is always finite; we
-        # only fall back to the nearest quoted rate if a degenerate query still
-        # produces a non-finite value.
+        # linear extrapolation beyond the quoted tenors
+        # duplicate tenors are collapsed in __init__, so the slope is always finite;
+        # fall back to the last quoted rate only if a degenerate query returns non-finite
         result = self._fn(t)
         result = np.where(np.isfinite(result), result, self._rates[-1])
         return float(result) if np.isscalar(t) else np.asarray(result)
@@ -69,7 +68,7 @@ class CurveInterpolator:
         date: pd.Timestamp,
         value_col: str = "MID_PRICE",
     ) -> "CurveInterpolator":
-        """Build interpolator for a single date from a stacked DataFrame."""
+        """Build a CurveInterpolator for a single date from a stacked DataFrame"""
         subset = df[df["DATE"] == date].copy()
         subset["t"] = (subset["MATURITY"] - date).dt.days / 365.25
         subset = subset.dropna(subset=["t", value_col])

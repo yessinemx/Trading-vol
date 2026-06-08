@@ -1,4 +1,4 @@
-"""Garman-Kohlhagen pricing model for FX options."""
+"""Garman-Kohlhagen closed-form pricing model for FX options"""
 
 import numpy as np
 from scipy.stats import norm
@@ -26,27 +26,27 @@ def garman_kohlhagen(
     option_type: str = "call",
 ) -> GKResult:
     """
-    Price an FX option using the Garman-Kohlhagen model.
+    Price an FX option using the Garman-Kohlhagen model
 
     Parameters
     ----------
-    S       : spot price (domestic per foreign)
-    K       : strike
-    T       : time to maturity in years
-    r_d     : domestic risk-free rate (continuous, decimal)
-    r_f     : foreign risk-free rate (continuous, decimal)
-    sigma   : implied volatility (decimal)
-    option_type : 'call' or 'put'
+    S: spot rate (domestic per foreign unit)
+    K: strike rate
+    T: time to maturity in years
+    r_d: domestic continuously-compounded risk-free rate (decimal)
+    r_f: foreign continuously-compounded risk-free rate (decimal)
+    sigma: implied volatility (decimal)
+    option_type: 'call' or 'put'
 
     Returns
     -------
-    GKResult with price and all first-order Greeks.
+    GKResult containing price and all first-order Greeks
     """
     if T <= 0:
         intrinsic = max(S - K, 0) if option_type == "call" else max(K - S, 0)
         return GKResult(intrinsic, float(S > K) if option_type == "call" else float(S < K), 0, 0, 0, 0, 0)
 
-    # Guard against degenerate inputs from extrapolated market data.
+    # guard degenerate inputs that may arise from extrapolated market data
     sigma = max(float(sigma), 1e-6)
     if not (np.isfinite(S) and np.isfinite(K) and np.isfinite(sigma) and S > 0 and K > 0):
         return GKResult(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
@@ -103,17 +103,17 @@ def garman_kohlhagen_vec(
     is_call: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
-    Vectorized Garman-Kohlhagen pricer.
+    Vectorized Garman-Kohlhagen pricer over a portfolio of positions
 
-    All inputs are broadcast-compatible numpy arrays.
-    is_call : bool array (True = call, False = put).
+    All inputs are 1-D numpy arrays of equal length.
+    is_call: boolean array (True = call, False = put)
 
     Returns
     -------
-    (price, delta, gamma, vega, theta) as float64 arrays.
-    Vega is per 1% vol move; theta is per calendar day.
+    Tuple (price, delta, gamma, vega, theta) as float64 arrays
+    Vega is scaled per 1% vol move; theta is scaled per calendar day
     """
-    from scipy.special import ndtr  # faster than norm.cdf for large arrays
+    from scipy.special import ndtr  # ndtr is faster than norm.cdf for array inputs
 
     S = np.asarray(S, dtype=float)
     K = np.asarray(K, dtype=float)
@@ -130,7 +130,7 @@ def garman_kohlhagen_vec(
     vega = np.zeros(n, dtype=float)
     theta = np.zeros(n, dtype=float)
 
-    # Expired positions: return intrinsic value
+    # expired positions: settle at intrinsic value
     expired = T <= 0
     if expired.any():
         dS = S[expired] - K[expired]
@@ -139,7 +139,7 @@ def garman_kohlhagen_vec(
                                   (dS > 0).astype(float),
                                   -(dS < 0).astype(float))
 
-    # Live positions: guard degenerate inputs
+    # live positions: filter degenerate inputs before pricing
     valid = ~expired & np.isfinite(S) & np.isfinite(K) & np.isfinite(sigma) & (S > 0) & (K > 0)
     if valid.any():
         Sv, Kv, Tv = S[valid], K[valid], T[valid]
@@ -152,7 +152,7 @@ def garman_kohlhagen_vec(
 
         nd1 = ndtr(d1);   nd2 = ndtr(d2)
         nd1n = ndtr(-d1); nd2n = ndtr(-d2)
-        npd1 = np.exp(-0.5 * d1 ** 2) * (1.0 / np.sqrt(2 * np.pi))  # norm.pdf vectorised
+        npd1 = np.exp(-0.5 * d1 ** 2) * (1.0 / np.sqrt(2 * np.pi)) 
 
         disc_d = np.exp(-rdv * Tv)
         disc_f = np.exp(-rfv * Tv)
@@ -169,6 +169,6 @@ def garman_kohlhagen_vec(
         theta_put  = (-Sv * disc_f * npd1 * sv / (2 * sqrtT)
                       + rdv * Kv * disc_d * nd2n
                       - rfv * Sv * disc_f * nd1n)
-        theta[valid] = np.where(cv, theta_call, theta_put) / 365.0  # per calendar day
+        theta[valid] = np.where(cv, theta_call, theta_put) / 365.0  
 
     return price, delta, gamma, vega, theta

@@ -1,4 +1,4 @@
-"""Calendar spread: long far-dated option, short near-dated option."""
+"""Calendar spread: long a far-dated option, short a near-dated option at the same strike"""
 
 from .base import Strategy, Leg
 

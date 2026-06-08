@@ -1,4 +1,4 @@
-"""ATM Straddle strategy: long call + long put at the same strike."""
+"""ATM straddle strategy: long call + long put at the same strike"""
 
 from collections.abc import Callable
 
