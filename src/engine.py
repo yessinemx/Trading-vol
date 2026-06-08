@@ -12,7 +12,7 @@ from .volatility.surface import VolSurface
 from .pricing.garman_kohlhagen import garman_kohlhagen, garman_kohlhagen_vec
 from .strategies.base import Strategy, Leg
 from .portfolio.position import Portfolio, OptionPosition
-from .analytics.performance import compute_metrics
+from .analytics.metrics import compute_metrics
 from .analytics.greeks_pnl import attribute_pnl
 
 

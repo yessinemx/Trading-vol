@@ -14,7 +14,7 @@ class OptionPosition:
     notional: float           # in domestic currency
     direction: int            # +1 long, -1 short
     premium_paid: float       # positive = cash out
-    vol_open: float = 0.0     # implied vol used at inception (for attribution)
+    vol_open: float = 0.0     # implied vol used at inception 
 
 
 @dataclass
@@ -50,8 +50,7 @@ class Portfolio:
         Adjust the spot hedge to target_units foreign-currency units at the given spot
 
         Returns the hedge P&L realised since the last rebalance (domestic currency),
-        which is also booked into cash. The first rebalance establishes the hedge
-        without booking P&L, to avoid a spurious mark against the zero-initialised cost
+        which is also booked into cash
         """
         if not self._hedge_init:
             self.hedge_units = target_units
