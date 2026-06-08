@@ -61,9 +61,9 @@ Every business day the engine computes the **net option delta** (in foreign-ccy
 units) and holds the opposite amount as a spot position. The hedge is rolled at the
 prevailing spot; its realised P&L is booked daily. Total P&L is therefore:
 
-$$\text{P\&L}_{\text{day}} = \underbrace{\Delta\text{MTM}_{\text{options}}}_{\text{option leg}} + \underbrace{\text{hedge P\&L}}_{\text{spot leg}}$$
+$$\text{PnL}_{\text{day}} = \underbrace{\Delta\text{MTM}_{\text{options}}}_{\text{option leg}} + \underbrace{\text{hedge PnL}}_{\text{spot leg}}$$
 
-### 1.6 Performance analytics
+### 1.6 Performance analyticsS
 
 Option-aware metrics on daily P&L: **Sharpe**, **Sortino** (downside-only),
 **max drawdown**, historical **VaR 95%** and **CVaR/Expected Shortfall 95%**,
@@ -158,12 +158,12 @@ strategy = Straddle(tenor_days=30, signal_fn=lambda h: momentum_signal(h, 20))
 ## 4. Quantitative deep dive — delta-hedged long straddle
 
 **Setup.** Long 30-day ATM straddle on EUR/NOK, rolled weekly, delta-hedged daily,
-2021-01 → 2024-12, 1,000,000 notional.
+2021-01 to 2024-12, 1,000,000 notional.
 
 **Economic rationale.** Once delta is neutralised, the straddle is a pure bet on
 **realised vs implied volatility**. Its carry is approximately
 
-$$\text{P\&L} \approx \tfrac12\,\Gamma\,S^2\big(\sigma_{\text{realised}}^2 - \sigma_{\text{implied}}^2\big)\,dt,$$
+$$\text{PnL} \approx \tfrac12\,\Gamma\,S^2\big(\sigma_{\text{realised}}^2 - \sigma_{\text{implied}}^2\big)\,dt$$
 
 i.e. it harvests gamma when the market moves more than the implied vol paid, and
 bleeds theta when it does not.

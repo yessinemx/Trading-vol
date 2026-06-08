@@ -24,11 +24,6 @@ poetry.lock
 # Data files 
 data/
 
-# Generated outputs
-outputs/*.csv
-outputs/*.png
-outputs/*.html
-
 # pytest / coverage
 .pytest_cache/
 .coverage
