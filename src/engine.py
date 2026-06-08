@@ -9,6 +9,8 @@ from pathlib import Path
 from .data.loader import MarketDataLoader
 from .curves.interpolator import CurveInterpolator
 from .volatility.surface import VolSurface
+from scipy.optimize import brentq
+
 from .pricing.garman_kohlhagen import garman_kohlhagen, garman_kohlhagen_vec
 from .strategies.base import Strategy, Leg
 from .portfolio.position import Portfolio, OptionPosition
@@ -66,24 +68,32 @@ class Backtester:
         Resolve a leg's strike from its target delta
 
         For ATM legs (delta 0.5) the strike equals the forward outright
-        For non-ATM legs, the function searches a strike grid spanning
-        +/-25% of the forward and selects the strike whose GK delta
-        best matches the target
+        For non-ATM legs, uses Brent's method on |delta(K)| - target over
+        [fwd*0.5, fwd*2.0]; falls back to a 201-point grid if the bracket
+        fails to straddle the root
         """
         if abs(leg.strike_delta - 0.5) < 1e-9:
             return fwd_outright
 
-        # search a strike grid spanning +/-25% of the forward for the target absolute delta
-        grid = np.linspace(fwd_outright * 0.75, fwd_outright * 1.25, 201)
         target = leg.strike_delta
-        best_k, best_err = fwd_outright, 1e9
-        for k in grid:
+        lo, hi = fwd_outright * 0.5, fwd_outright * 2.0
+
+        def delta_err(k: float) -> float:
             vol = vol_surface.get_vol(k, t)
             res = garman_kohlhagen(S, k, t, rd, rf, vol, leg.option_type)
-            err = abs(abs(res.delta) - target)
-            if err < best_err:
-                best_err, best_k = err, k
-        return float(best_k)
+            return abs(res.delta) - target
+
+        try:
+            return float(brentq(delta_err, lo, hi, xtol=1e-6, maxiter=50))
+        except ValueError:
+            # fallback: grid search if bracket does not straddle the root
+            grid = np.linspace(lo, hi, 201)
+            best_k, best_err = fwd_outright, 1e9
+            for k in grid:
+                err = abs(delta_err(k))
+                if err < best_err:
+                    best_err, best_k = err, k
+            return float(best_k)
 
     def run(
         self,
@@ -119,6 +129,7 @@ class Backtester:
         prev_S = None           # previous spot used for hedge rebalancing and attribution
         prev_delta = 0.0        # previous portfolio delta in foreign-currency units
         prev_snap: dict[int, dict] = {}  # per-position Greek snapshot for attribution
+        mtm_new_today = 0.0     # MTM of legs opened today; excluded from option_pnl
 
         for date in dates:
             if date not in self._spot.index:
@@ -150,6 +161,7 @@ class Backtester:
             open_positions = still_open
 
             # -- open new legs on roll dates (entry gated by signal) ---------
+            mtm_new_today = 0.0
             if date in roll_dates:
                 history = self._spot.loc[:date, "MID_PRICE"]
                 if strategy.signal(date, S, history):
@@ -185,6 +197,7 @@ class Backtester:
                             premium_paid=premium,
                             vol_open=vol,
                         )
+                        mtm_new_today += res.price * leg_notional * leg.direction
                         portfolio.open_position(pos)
                         open_positions.append(pos)
 
@@ -260,7 +273,9 @@ class Backtester:
                 hedge_pnl = portfolio.hedge_mtm(S) - portfolio.hedge_mtm(prev_S)
 
             # -- daily P&L: option MTM change plus hedge P&L -----------------
-            option_pnl = mtm - prev_mtm
+            # subtract MTM of legs opened today to avoid counting their fair-value
+            # as a spurious gain on the roll day (premium cash flow is already booked)
+            option_pnl = mtm - prev_mtm - mtm_new_today
             day_pnl = option_pnl + hedge_pnl
 
             # -- Greek P&L attribution (delta/gamma/vega/theta + residual) ---

@@ -87,13 +87,13 @@ class VolSurface:
         if tenors.size == 1:
             return float(vols_at_strike[0])
 
-        # linear interpolation and extrapolation in the time dimension
-        time_interp = interp1d(
-            tenors,
-            vols_at_strike,
-            kind="linear",
-            bounds_error=False,
-            fill_value="extrapolate",
-        )
-        return float(time_interp(t))
+        # linear interpolation in the time dimension using np.interp (no object allocation);
+        # handle linear extrapolation beyond the quoted tenor range manually
+        if t <= tenors[0]:
+            slope = (vols_at_strike[1] - vols_at_strike[0]) / (tenors[1] - tenors[0])
+            return float(vols_at_strike[0] + slope * (t - tenors[0]))
+        if t >= tenors[-1]:
+            slope = (vols_at_strike[-1] - vols_at_strike[-2]) / (tenors[-1] - tenors[-2])
+            return float(vols_at_strike[-1] + slope * (t - tenors[-1]))
+        return float(np.interp(t, tenors, vols_at_strike))
 
