@@ -15,18 +15,23 @@ delta hedging, Greeks P&L attribution and a signal/sizing framework.
 
 ## Table of contents
 
-1. [Highlights](#highlights)
-2. [Architecture](#architecture)
-3. [Project layout](#project-layout)
-4. [Installation](#installation)
-5. [Market data](#market-data)
-6. [Quick start](#quick-start)
-7. [Strategies, signals and sizing](#strategies-signals-and-sizing)
-8. [Outputs and reporting](#outputs-and-reporting)
-9. [Testing](#testing)
-10. [Documentation](#documentation)
-11. [Limitations and roadmap](#limitations-and-roadmap)
-12. [Author](#author)
+- [FX Option Backtesting Engine](#fx-option-backtesting-engine)
+  - [Table of contents](#table-of-contents)
+  - [Highlights](#highlights)
+  - [Architecture](#architecture)
+  - [Project layout](#project-layout)
+  - [Installation](#installation)
+    - [With Poetry](#with-poetry)
+  - [Market data](#market-data)
+  - [Quick start](#quick-start)
+  - [Strategies, signals and sizing](#strategies-signals-and-sizing)
+    - [Strategies](#strategies)
+    - [Signals](#signals)
+    - [Sizing](#sizing)
+  - [Testing](#testing)
+  - [Documentation](#documentation)
+  - [Limitations and roadmap](#limitations-and-roadmap)
+  - [Author](#author)
 
 ---
 
@@ -91,11 +96,11 @@ notebooks/
 └── backtester.ipynb   # End-to-end walkthrough on EUR/NOK
 tests/                 # 17 unit tests: pricing parity, interpolation, analytics
 data/                  # Parquet market data (gitignored)
-outputs/               # Generated CSV / PNG artefacts (gitignored)
+outputs/               # Generated CSV / PNG artefacts
 docs/
 ├── architecture.png   # Component diagram
 ├── USER_GUIDE.tex     # LaTeX source of the user guide
-└── USER_GUIDE.pdf     # Compiled methodology + deep-dive (7 pages)
+└── USER_GUIDE.pdf     # Compiled methodology + deep-dive 
 ```
 
 ---
@@ -104,20 +109,12 @@ docs/
 
 Requires **Python ≥ 3.11**.
 
-### With Poetry (recommended)
+### With Poetry 
 
 ```bash
 poetry install
 poetry shell
 ```
-
-### Without Poetry
-
-```bash
-pip install pandas numpy scipy matplotlib seaborn plotly pyarrow jupyter ipykernel pytest
-```
-
----
 
 ## Market data
 
@@ -153,7 +150,7 @@ results  = bt.run(
     roll_freq="W-FRI",
 )
 
-print(results["metrics"])               # dict: sharpe, sortino, max_dd, VaR, CVaR, …
+print(results["metrics"])             
 results["daily_pnl"].cumsum().plot()
 ```
 
@@ -209,39 +206,10 @@ of `Strategy`.
 
 ---
 
-## Outputs and reporting
-
-After running the notebook end-to-end, `outputs/` is populated with:
-
-| File                              | Content                                                  |
-| --------------------------------- | -------------------------------------------------------- |
-| `metrics.csv`                     | Per-strategy performance summary                         |
-| `cumulative_pnl.csv`              | Daily and cumulative P&L series                          |
-| `straddle_greeks_attribution.csv` | Δ / Γ / ν / Θ / residual breakdown for the long straddle |
-| `strategy_comparison.png`         | Cumulative P&L chart of all strategies                   |
-
-Sample comparison (EUR/NOK, 2021–2024, daily delta-hedged, notional = 1 M EUR):
-
-| Strategy          | Total P&L (NOK) | Sharpe | Sortino | Max DD (NOK) |
-| ----------------- | --------------: | -----: | ------: | -----------: |
-| Straddle (long)   |      +1 301 509 |  +0.13 |   +0.15 |   −2 868 948 |
-| Call Ratio Spread |        −621 602 |  −0.21 |   −0.20 |   −1 989 483 |
-| Calendar Spread   |      −1 868 530 |  −0.16 |   −0.15 |  −11 905 184 |
-
-The Greek attribution of the long straddle isolates the textbook long-gamma
-signature: cumulative gamma ≈ +21 M is almost exactly offset by theta ≈ −24 M,
-with hedged delta, vega and residual all small.
-
----
-
 ## Testing
 
 ```bash
-poetry run pytest        # or: py -m pytest
-```
-
-```
-17 passed in 1.44s
+poetry run pytest      
 ```
 
 Coverage includes:
